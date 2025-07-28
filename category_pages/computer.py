@@ -1,8 +1,8 @@
-# category_pages/computer.py
 import streamlit as st
 import os
 from langchain_community.document_loaders import PyPDFLoader
 from vectorstore_utils import save_chroma_vectorstore, list_chroma_files
+from category_pages.computer_funcs import preview  # 🔁 미리보기 모듈 추가
 
 CATEGORY_NAME = "컴퓨터활용능력"
 
@@ -35,8 +35,9 @@ def render():
     st.markdown("---")
     st.subheader("📚 저장된 문서 목록")
     subfolders = list_chroma_files(CATEGORY_NAME)
+
     if subfolders:
         for folder in subfolders:
-            st.markdown(f"🔹 `{folder}`")
+            preview.render(folder)  # 🔁 버튼 클릭시 미리보기 포함
     else:
         st.info("❗ 저장된 문서가 없습니다.")
