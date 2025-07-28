@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # category_pages/computer_funcs/preview.py
 
 import streamlit as st
@@ -54,3 +55,5 @@ def render_documents(folder_name: str):
             st.markdown(pdf_viewer, unsafe_allow_html=True)
         except Exception as e:
             st.error(f"PDF 표시 오류: {e}")
+=======
+>>>>>>> d7b78c0 (preview 보류)
