@@ -49,7 +49,7 @@ def load_vectorstore():
         openai_api_key=openai_api_key
     )
 
-    faiss_path = "faiss_db"
+    faiss_path = "faiss_2_db"
     if not os.path.exists(faiss_path):
         vectordb = FAISS.from_documents(chunks, embedding_model)
         vectordb.save_local(faiss_path)
