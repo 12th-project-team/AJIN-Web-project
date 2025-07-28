@@ -2,6 +2,7 @@ from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
 from dotenv import load_dotenv
 import os
+import shutil
 
 # 환경 변수에서 OpenAI API 키 로딩
 load_dotenv()
@@ -42,3 +43,18 @@ def list_chroma_files(category: str):
     if not os.path.exists(base_path):
         return []
     return [f for f in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, f))]
+
+def delete_chroma_vectorstore(category: str, filename: str, doc_type: str = ""):
+    """
+    특정 카테고리/문서에 해당하는 Chroma 벡터스토어 및 업로드된 PDF 삭제
+    """
+    # Chroma 임베딩 데이터 삭제
+    persist_path = get_chroma_path(category, filename)
+    if os.path.exists(persist_path):
+        shutil.rmtree(persist_path)
+
+    # 업로드된 PDF 원본 삭제
+    if doc_type:
+        pdf_path = os.path.join("uploaded_pdfs", doc_type, f"{filename}.pdf")
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
