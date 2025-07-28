@@ -2,7 +2,7 @@ import streamlit as st
 import os
 from langchain_community.document_loaders import PyPDFLoader
 from vectorstore_utils import save_chroma_vectorstore, list_chroma_files
-from category_pages.computer_funcs import preview  # 🔁 미리보기 모듈 추가
+from category_pages.computer_funcs.summary import render_summary  # 🔁 미리보기 모듈 추가
 
 CATEGORY_NAME = "컴퓨터활용능력"
 
