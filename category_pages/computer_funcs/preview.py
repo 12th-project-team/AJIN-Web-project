@@ -1,8 +1,14 @@
+# category_pages/computer_funcs/preview.py
+
 import streamlit as st
 import os
 import base64
 
-def render(folder_name: str):
+def render_documents(folder_name: str):
+    """
+    업로드된 PDF를 다운로드 & 인라인 뷰어로 표시합니다.
+    uploaded_pdfs/<folder_name>.pdf 경로의 파일을 찾습니다.
+    """
     pdf_path = os.path.join("uploaded_pdfs", f"{folder_name}.pdf")
 
     if not os.path.exists(pdf_path):
@@ -20,6 +26,7 @@ def render(folder_name: str):
         st.markdown("---")
         st.subheader(f"📖 미리보기: {folder_name}")
 
+        # 파일 읽기
         try:
             with open(pdf_path, "rb") as f:
                 file_bytes = f.read()
@@ -35,6 +42,7 @@ def render(folder_name: str):
             mime="application/pdf"
         )
 
+        # 인라인 뷰어
         try:
             base64_pdf = base64.b64encode(file_bytes).decode("utf-8")
             pdf_viewer = f"""
