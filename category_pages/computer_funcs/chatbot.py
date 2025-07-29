@@ -1,7 +1,33 @@
 import streamlit as st
+from langchain_openai import ChatOpenAI
+from vectorstore_utils import load_chroma_vectorstore
+import os
 
-def render(category_name, retriever, llm):
-    st.info(f"🤖 챗봇 탭 - {category_name}")
+CATEGORY_NAME = "컴퓨터활용능력"
+
+def render():
+    st.header(f"🤖 {CATEGORY_NAME} - 문서 기반 챗봇")
+
+    base_path = os.path.join("chroma_db", CATEGORY_NAME)
+    if not os.path.exists(base_path):
+        st.info("❗ 저장된 문서가 없습니다. 먼저 PDF를 업로드하세요.")
+        return
+
+    subfolders = os.listdir(base_path)
+    if not subfolders:
+        st.info("❗ 저장된 문서가 없습니다. 먼저 PDF를 업로드하세요.")
+        return
+
+    selected_doc = st.selectbox("질문할 문서를 선택하세요", subfolders)
+
+    try:
+        vectordb = load_chroma_vectorstore(CATEGORY_NAME, selected_doc)
+    except Exception as e:
+        st.error(f"벡터스토어 로드 실패: {e}")
+        return
+
+    retriever = vectordb.as_retriever(search_kwargs={"k": 3})
+    llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0)
 
     query = st.text_input("질문을 입력하세요:")
 
@@ -21,6 +47,10 @@ def render(category_name, retriever, llm):
 [문서 내용]
 {context}
 """
-            result = llm.invoke(prompt)
+            response = llm.invoke(prompt)
+
         st.subheader("🤖 답변")
-        st.write(result.content)
+        if hasattr(response, "content"):
+            st.write(response.content)
+        else:
+            st.write(response)  # fallback for str or 기타 객체

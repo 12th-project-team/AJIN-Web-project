@@ -5,7 +5,7 @@ import os
 
 CATEGORY_NAME = "컴퓨터활용능력"
 
-def render_summary():
+def render():
     st.header(f"📌 {CATEGORY_NAME} - 요약")
 
     base_path = os.path.join("chroma_db", CATEGORY_NAME)

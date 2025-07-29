@@ -2,7 +2,11 @@ import streamlit as st
 import os
 from langchain_community.document_loaders import PyPDFLoader
 from vectorstore_utils import save_chroma_vectorstore, list_chroma_files
-from category_pages.computer_funcs.summary import render_summary  # 🔁 미리보기 모듈 추가
+from category_pages.computer_funcs import preview  
+from category_pages.computer_funcs.summary import render as render_summary
+from category_pages.computer_funcs.quiz import render as render_quiz
+from category_pages.computer_funcs.exam import render as render_exam
+from category_pages.computer_funcs.chatbot import render as render_chatbot
 
 CATEGORY_NAME = "컴퓨터활용능력"
 
@@ -24,13 +28,13 @@ def render():
 
     tab1, tab2, tab3, tab4 = st.tabs(["📌 요점정리", "✅ 퀴즈", "📄 기출문제", "🤖 챗봇"])
     with tab1:
-        st.info("요점정리 탭 내용")
+        render_summary()
     with tab2:
-        st.info("퀴즈 탭 내용")
+        render_quiz()
     with tab3:
-        st.info("기출문제 탭 내용")
+        render_exam()
     with tab4:
-        st.info("챗봇 탭 내용")
+        render_chatbot()
 
     st.markdown("---")
     st.subheader("📚 저장된 문서 목록")

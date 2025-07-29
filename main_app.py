@@ -1,6 +1,10 @@
 # main_app.py
 import streamlit as st
 from category_pages import computer, info, word, itq, office
+from category_pages.computer_funcs.summary import render as render_summary
+from category_pages.computer_funcs.quiz import render as render_quiz
+from category_pages.computer_funcs.exam import render as render_exam
+from category_pages.computer_funcs.chatbot import render as render_chatbot
 
 CATEGORIES = {
     "컴퓨터활용능력": computer.render,
