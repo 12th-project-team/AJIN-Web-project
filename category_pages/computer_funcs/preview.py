@@ -1,14 +1,10 @@
-<<<<<<< HEAD
-# category_pages/computer_funcs/preview.py
-
 import streamlit as st
 import os
 import base64
 
-def render_documents(folder_name: str):
+def render(folder_name: str):
     """
-    업로드된 PDF를 다운로드 & 인라인 뷰어로 표시합니다.
-    uploaded_pdfs/<folder_name>.pdf 경로의 파일을 찾습니다.
+    uploaded_pdfs/<folder_name>.pdf 파일을 다운로드 및 인라인 뷰어로 표시합니다.
     """
     pdf_path = os.path.join("uploaded_pdfs", f"{folder_name}.pdf")
 
@@ -27,7 +23,7 @@ def render_documents(folder_name: str):
         st.markdown("---")
         st.subheader(f"📖 미리보기: {folder_name}")
 
-        # 파일 읽기
+        # PDF 바이트 읽기
         try:
             with open(pdf_path, "rb") as f:
                 file_bytes = f.read()
@@ -40,20 +36,17 @@ def render_documents(folder_name: str):
             label="⬇️ PDF 다운로드",
             data=file_bytes,
             file_name=f"{folder_name}.pdf",
-            mime="application/pdf"
+            mime="application/pdf",
         )
 
-        # 인라인 뷰어
+        # 인라인 PDF 뷰어
         try:
-            base64_pdf = base64.b64encode(file_bytes).decode("utf-8")
-            pdf_viewer = f"""
-                <iframe src="data:application/pdf;base64,{base64_pdf}"
-                        width="100%" height="800px"
-                        style="border:1px solid #ccc; border-radius: 8px;">
-                </iframe>
-            """
-            st.markdown(pdf_viewer, unsafe_allow_html=True)
+            b64 = base64.b64encode(file_bytes).decode("utf-8")
+            iframe = (
+                f'<iframe src="data:application/pdf;base64,{b64}" '
+                f'width="100%" height="800px" '
+                f'style="border:1px solid #ccc; border-radius:8px;"></iframe>'
+            )
+            st.markdown(iframe, unsafe_allow_html=True)
         except Exception as e:
             st.error(f"PDF 표시 오류: {e}")
-=======
->>>>>>> d7b78c0 (preview 보류)

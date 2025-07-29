@@ -9,6 +9,10 @@ from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from vectorstore_utils import list_chroma_files, delete_chroma_vectorstore
 from category_pages import computer
+from category_pages.computer_funcs.summary import render as render_summary
+from category_pages.computer_funcs.quiz import render as render_quiz
+from category_pages.computer_funcs.exam import render as render_exam
+from category_pages.computer_funcs.chatbot import render as render_chatbot
 
 # ───────────────────────────────
 # 0) 환경 변수 및 OpenAI 키 설정
