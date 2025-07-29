@@ -8,7 +8,7 @@ from category_pages.computer_funcs.chatbot import render as render_chatbot
 
 CATEGORIES = {
     "컴퓨터활용능력": computer.render,
-    "정보처리": info.render,
+    "정보처리기사": info.render,
     "워드프로세서": word.render,
     "ITQ/GTQ": itq.render,
     "사무자동화": office.render,
