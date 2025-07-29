@@ -6,7 +6,7 @@ import re
 
 CATEGORY_NAME = "컴퓨터활용능력"
 
-def build_context_from_docs(docs, max_length=12000):
+def build_context_from_docs(docs, max_length=8000):
     context = ""
     for doc in docs:
         if len(context) + len(doc.page_content) > max_length:
@@ -81,11 +81,11 @@ def render():
             try:
                 vectordb = load_chroma_vectorstore(CATEGORY_NAME, selected_doc)
                 retriever = vectordb.as_retriever(search_kwargs={"k": 15})
-                llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0.95)
+                llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0.4)
                 docs = retriever.get_relevant_documents(query)
                 context = build_context_from_docs(docs)
                 with st.spinner("📝 퀴즈를 생성 중입니다..."):
-                    response = generate_quiz(llm, context)
+                    response = generate_quiz(llm, context, query)  # <-- query가 topic 역할
                     quiz_list = parse_quiz(response.content if hasattr(response, "content") else response)
                 st.session_state.quiz = quiz_list
                 st.session_state.answers = {}
@@ -141,3 +141,4 @@ def render():
                 if key in st.session_state:
                     del st.session_state[key]
             st.rerun()  # ✅ 최신 rerun 함수
+
