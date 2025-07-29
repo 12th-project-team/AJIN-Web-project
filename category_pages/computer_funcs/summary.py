@@ -26,9 +26,8 @@ def render():
         st.error(f"벡터스토어 로드 실패: {e}")
         return
 
-    # k값 늘려서 맥락 다양하게 확보 (실험적으로 10~15도 가능)
-    retriever = vectordb.as_retriever(search_kwargs={"k": 12})
-    llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.2)
+    retriever = vectordb.as_retriever(search_kwargs={"k": 20})  # 다양한 맥락 확보
+    llm = ChatOpenAI(model_name="gpt-4o-mini", temperature=0.1)
 
     query = st.text_input(
         "요약할 주제를 입력하세요:",
@@ -41,26 +40,42 @@ def render():
             return
 
         docs = retriever.get_relevant_documents(query)
-        context = "\n".join([doc.page_content for doc in docs if doc.page_content.strip()])
+        # 주제 키워드 filtering (korean/english 띄어쓰기, 콤마 구분)
+        keywords = [kw.strip() for kw in query.replace(',', ' ').split()]
+        filtered_docs = [
+            doc for doc in docs if any(kw in doc.page_content for kw in keywords)
+        ]
+        if not filtered_docs:
+            st.info("❗ 해당 주제와 관련된 내용이 문서에서 검색되지 않았습니다.")
+            return
 
-        # 프롬프트: 실제 시험 대비, '직접적 관련성' 강조, 분류/제목/불필요한 내용 제외 요구
+        context = "\n".join([doc.page_content for doc in filtered_docs if doc.page_content.strip()])
+
         prompt = f"""
-너는 컴퓨터활용능력 공식 문서 기반 요약 전문가야.
+너는 컴퓨터활용능력 공식 문서 기반 요약 전문가이자, 채점관이야.
 
-- 아래 문서 내용에서 '{query}'와 직접적으로 관련된 핵심만 추려서 10개 이내의 소주제(소단락)로 분류해서 각 소주제별로 3~5줄 이내로만 간결하게 요약해.
-- 각 소주제(소단락)마다 한글 제목을 붙이고, 해당 내용이 불확실하거나 없으면 '관련 내용 없음'이라고 써.
-- 배경 설명, 발전사, 주변 개념, 일반론, 추측, 사족 등은 모두 빼고 실제 시험 대비에 필요한 구체적 요약만 제시해.
-- 출력 형식(예시):
-    1. [소주제1 제목]: (3~5줄 요약)
-    2. [소주제2 제목]: (3~5줄 요약)
-    ...
+[필수 지침]
+- 반드시 아래 문서 내용에서 '{query}'와 직접적 또는 부분적으로 연관된 내용도 모두 포함 뽑아라.
+- '{query}'와 관련 없는 배경 설명, 주변 개념, 추측, 일반론, 사족 등은 절대 포함하지 마라.
+- 주제와 완전히 무관한 문장은 절대 생성하지 마라. 근거 없는 일반론, 상식, 부연설명 금지.
+- '관련 내용 없음'은 해당 주제 키워드가 실제 문서에 없을 때만 출력하라.
+- 실제 시험 대비에 필요한 **구체적, 실무적, 명확한 요약**만 제시하라.
 
-아래는 참고할 문서 내용이다:
+[출력 형식]
+- 관련 핵심 내용을 10개 이내의 소주제로 분류하여, 각 소주제(소단락)마다 **한글 제목**을 붙이고, 각 단락을 3~5줄 이내로 간결하게 요약하라.
+- 반드시 번호와 제목, 요약이 구분되게 예시처럼 출력하라.
+
+[출력 예시]
+1. [소주제1 제목]: (3~5줄 요약)
+2. [소주제2 제목]: (3~5줄 요약)
+...
+
+[문서에서 '{query}'와 직접적으로 연관된 문단(문장)만 활용하여 요약하라.]
+
 -------------------------
 {context}
 -------------------------
 """
-
         with st.spinner("📘 요약 중..."):
             response = llm.invoke(prompt)
         st.subheader("📘 요점정리 결과")
