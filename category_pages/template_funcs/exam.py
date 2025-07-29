@@ -1,5 +1,7 @@
+# category_pages/template_funcs/exam.py
+
 import streamlit as st
 
 def render(category_name: str):
-    st.info(f"📄 기출문제 탭 - {category_name}")
-    # TODO: 기출문제 로직을 여기에 구현하세요.
+    st.header(f"📄 {category_name} - 기출문제")
+    st.info("아직 구현되지 않은 탭입니다.")
