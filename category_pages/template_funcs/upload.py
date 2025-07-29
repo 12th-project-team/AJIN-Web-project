@@ -1,6 +1,3 @@
-# category_pages/template_funcs/upload.py
-# (또는 category_pages/computer_funcs/upload.py)
-
 import streamlit as st
 import os
 from langchain_community.document_loaders import PyPDFLoader
@@ -14,6 +11,7 @@ def render(category_name: str):
         horizontal=True,
         key=f"doctype_{category_name}"
     )
+
     # 2) PDF 업로드
     uploaded_file = st.file_uploader(
         "📤 PDF 업로드",
@@ -23,30 +21,32 @@ def render(category_name: str):
 
     if uploaded_file:
         with st.spinner("PDF 분석 및 저장 중..."):
+            # 저장 디렉토리 생성
             base_dir = os.path.join("uploaded_pdfs", doc_type)
             os.makedirs(base_dir, exist_ok=True)
             pdf_path = os.path.join(base_dir, uploaded_file.name)
 
-            # 파일 저장
+            # 파일 쓰기
             with open(pdf_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
 
-            # PDF 로드 → Document 리스트 생성
+            # PDF 로딩 → 문서 리스트 생성
             loader = PyPDFLoader(pdf_path)
             docs = loader.load()
             filename = os.path.splitext(uploaded_file.name)[0]
 
-            # Chroma 저장
+            # Chroma 벡터스토어 저장
             save_path = save_chroma_vectorstore(docs, category_name, filename)
             st.success(f"✅ `{doc_type}` 문서 저장 완료: `{save_path}`")
 
-            # 간단 미리보기
+            # 미리보기
             with st.expander("👀 문서 미리보기", expanded=False):
                 for page in docs[:3]:
-                    st.markdown(f"**- {page.metadata['page']}페이지**")
+                    page_no = page.metadata.get("page", "")
+                    st.markdown(f"**- {page_no}페이지**")
                     st.write(page.page_content[:500] + ("..." if len(page.page_content) > 500 else ""))
 
-    # 3) 업로드된 문서 목록 & 삭제 UI
+    # 3) 저장된 문서 목록 & 삭제 UI
     st.markdown("---")
     st.markdown(f"### 📂 `{doc_type}` 문서 목록")
     folder_path = os.path.join("uploaded_pdfs", doc_type)
@@ -56,10 +56,10 @@ def render(category_name: str):
             with col1:
                 st.markdown(f"- 📄 `{fname}`")
             with col2:
-                if st.button("🗑", key=f"delete_{fname}_{category_name}"):
+                if st.button("🗑", key=f"delete_{category_name}_{doc_type}_{fname}"):
                     file_id = os.path.splitext(fname)[0]
                     delete_chroma_vectorstore(category_name, file_id, doc_type)
                     st.success("삭제 완료!")
-                    st.experimental_rerun()
+                    st.experimental_rerun()  # 또는 필요에 따라 st.rerun()
     else:
         st.info("📭 아직 업로드된 문서가 없습니다.")

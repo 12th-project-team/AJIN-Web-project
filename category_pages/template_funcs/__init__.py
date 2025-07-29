@@ -7,3 +7,5 @@ from .summary   import render               as summary
 from .exam      import render               as exam
 from .quiz      import render               as quiz
 from .chatbot   import render               as chatbot
+
+from . import upload, preview, summary, exam, quiz, chatbot

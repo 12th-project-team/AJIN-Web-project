@@ -1,17 +1,13 @@
-# category_pages/computer_funcs/chatbot.py
-
 import os
 import streamlit as st
 from langchain_community.vectorstores import Chroma
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.chat_models import ChatOpenAI
+from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_community.chat_models import ChatOpenAI
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 
-# OpenAI 키는 .env 에서 로드됩니다
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
-# 카카오톡 말풍선 스타일 CSS
 CHAT_STYLE = """ 
 <style>
 .chat-container {
@@ -61,7 +57,6 @@ h2 {
 </style>
 """
 
-# 1. 커스텀 프롬프트 (context와 question)
 custom_prompt = PromptTemplate(
     input_variables=["context", "question"],
     template="""
@@ -122,13 +117,9 @@ def handle_submit(category_name: str):
         answer = qa_chain.run(user_question)
         st.session_state.chat_history.append((user_question, answer))
     
-    # 입력창 초기화
     st.session_state.chatbot_question_input = ""
 
 def render(category_name: str):
-    """
-    category_name 에 해당하는 카테고리명으로 챗봇 UI 렌더링
-    """
     st.markdown(CHAT_STYLE, unsafe_allow_html=True)
     st.header(f"💬 {category_name} 문서 기반 챗봇")
 
@@ -145,7 +136,6 @@ def render(category_name: str):
         st.info("❗ 저장된 문서가 없습니다.")
         return
 
-    # 세션에 채팅 기록이 없으면 초기화
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
@@ -159,11 +149,9 @@ def render(category_name: str):
         key="chatbot_doc_select"
     )
 
-    # 이전 대화 내역 렌더링
     if st.session_state.chat_history:
         render_chat_history(st.session_state.chat_history)
 
-    # 질문 입력창
     st.text_input(
         label="❓ 질문을 입력하세요",
         key="chatbot_question_input",

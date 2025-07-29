@@ -4,7 +4,7 @@ import base64
 
 def render(category_name: str):
     """
-    uploaded_pdfs/<category_name>.pdf 파일을 다운로드 및 인라인 뷰어로 표시합니다.
+    uploaded_pdfs/<category_name>.pdf 파일을 다운로드 & 인라인 뷰어로 표시합니다.
     """
     pdf_path = os.path.join("uploaded_pdfs", f"{category_name}.pdf")
 
@@ -16,7 +16,7 @@ def render(category_name: str):
     if toggle_key not in st.session_state:
         st.session_state[toggle_key] = False
 
-    if st.button(f"📄 {category_name}", key=f"btn_preview_{category_name}"):
+    if st.button(f"📄 {category_name}", key=f"button_{category_name}"):
         st.session_state[toggle_key] = not st.session_state[toggle_key]
 
     if st.session_state[toggle_key]:
@@ -35,10 +35,10 @@ def render(category_name: str):
             label="⬇️ PDF 다운로드",
             data=file_bytes,
             file_name=f"{category_name}.pdf",
-            mime="application/pdf"
+            mime="application/pdf",
         )
 
-        # 인라인 뷰어
+        # 인라인 PDF 뷰어
         try:
             b64 = base64.b64encode(file_bytes).decode("utf-8")
             iframe = (
