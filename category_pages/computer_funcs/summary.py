@@ -1,6 +1,6 @@
 import streamlit as st
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage  # ✅ 추가
+from langchain_core.messages import HumanMessage
 from vectorstore_utils import load_chroma_vectorstore
 import os
 
@@ -46,7 +46,7 @@ def render(category_name: str):
 """
 
         with st.spinner("📘 요약 중..."):
-            result = llm.invoke([HumanMessage(content=prompt)])  # ✅ 수정된 부분
+            result = llm.invoke([HumanMessage(content=prompt)])
 
         st.subheader("📘 요약 결과")
-        st.write(result.content)  # ✅ 수정된 부분
+        st.write(result.content)

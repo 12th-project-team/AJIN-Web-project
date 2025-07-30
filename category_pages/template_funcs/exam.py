@@ -1,143 +1,147 @@
 import os
 import json
 import streamlit as st
-from typing import List, Dict
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_openai import ChatOpenAI
-from langchain.prompts import PromptTemplate
-from langchain.schema import Document
-from langchain_community.embeddings import OpenAIEmbeddings
-from langchain_community.vectorstores import Chroma
-from vectorstore_utils import save_exam_questions, load_exam_questions
+import fitz  # PyMuPDF
+import openai
+from dotenv import load_dotenv
 
-# ————————————
-# 1) PDF 업로드 → 문제 추출 → 벡터스토어 저장
-# ————————————
+load_dotenv()
+openai.api_key = os.getenv("OPENAI_API_KEY", "").strip()
 
-def ingest_exam_pdf(category_name: str):
-    st.subheader("📤 기출문제 PDF 업로드 및 인제스트")
-    uploaded_file = st.file_uploader(
-        "🗂️ 객관식 문제 PDF 업로드",
-        type=["pdf"],
-        key=f"exam_upload_{category_name}"
+UPLOAD_DIR = "uploaded_pdfs"
+EXAM_DB_DIR = "exam_db"
+
+def ensure_dirs(category: str):
+    pdf_dir  = os.path.join(UPLOAD_DIR, category)
+    json_dir = os.path.join(EXAM_DB_DIR, category)
+    os.makedirs(pdf_dir, exist_ok=True)
+    os.makedirs(json_dir, exist_ok=True)
+    return pdf_dir, json_dir
+
+def list_uploaded_pdfs(category: str):
+    pdf_dir = os.path.join(UPLOAD_DIR, category)
+    if not os.path.exists(pdf_dir):
+        return []
+    return [f[:-4] for f in os.listdir(pdf_dir) if f.lower().endswith(".pdf")]
+
+def list_saved_jsons(category: str):
+    json_dir = os.path.join(EXAM_DB_DIR, category)
+    if not os.path.exists(json_dir):
+        return []
+    return [f[:-5] for f in os.listdir(json_dir) if f.lower().endswith(".json")]
+
+def extract_questions_with_gpt(text):
+    prompt = (
+        "아래 텍스트는 자격증 객관식 시험 문제지입니다.\n"
+        "문항 번호(Q1, Q2, ...)로 시작하는 부분만 문제로 인식해서 추출하세요.\n"
+        "정답, 해설, 정답표, 해설집, 해설 모음, 보충 설명 등은 문제로 인식하지 말고 무시하세요.\n"
+        "각 문제는 question, choices(4지선다), answer(정답 번호 1~4), explanation(해설 또는 '없음') 필드를 갖는 JSON 배열로만 반환하세요.\n"
+        "설명, 안내, 코드블록 없이 예시와 완전히 동일한 JSON 배열만 출력하세요.\n"
+        "예시: [{\"question\": \"질문\", \"choices\": [\"보기1\", \"보기2\", \"보기3\", \"보기4\"], \"answer\": 2, \"explanation\": \"해설\"}]"
     )
-    if not uploaded_file:
-        return
+    completion = openai.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": text},
+        ],
+        temperature=0,
+        max_tokens=2048,
+    )
+    content = completion.choices[0].message.content.strip()
+    # 코드블록이나 안내문 제거
+    if content.startswith("```json"):
+        content = content[7:]
+    if content.endswith("```"):
+        content = content[:-3]
+    # 파싱
+    return json.loads(content)
 
-    if st.button("🚀 문제 추출 및 저장 시작", key=f"exam_ingest_btn_{category_name}"):
-        with st.spinner("⏳ PDF 분석 중... 잠시만 기다려주세요."):
-            # 1) PDF 로드
-            loader = PyPDFLoader(uploaded_file)
-            pages: List[Document] = loader.load_and_split()  # 페이지별 Document
+def parse_pdf_and_save(category: str, filename: str):
+    pdf_dir, json_dir = ensure_dirs(category)
+    pdf_path = os.path.join(pdf_dir, f"{filename}.pdf")
+    doc = fitz.open(pdf_path)
 
-            # 2) OpenAI로 문제·보기·정답·해설 파싱
-            llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
-            prompt = PromptTemplate(
-                input_variables=["page_content"],
-                template="""
-아래는 시험지의 한 페이지 내용입니다. 
-이 중 객관식 문제(문제 번호, 보기 4개, 정답 번호, 해설)를 JSON 리스트 형태로 뽑아 주세요.
-반드시 다음 형태로만 응답하세요:
-
-[
-  {{
-    "question": "...",
-    "choices": ["...", "...", "...", "..."],
-    "answer": 2,         # 정답 보기의 인덱스(1~4)
-    "explanation": "..."
-  }},
-  ... 
-]
-
-페이지 내용:
-{page_content}
-"""
-            )
-            all_items: List[Dict] = []
-            for doc in pages:
-                res = llm.invoke(prompt.format(page_content=doc.page_content))
-                # GPT 응답을 JSON으로 변환
-                items = json.loads(res.content)
-                for itm in items:
-                    itm["page"] = doc.metadata.get("page", None)
+    all_items = []
+    for page_num in range(len(doc)):
+        page = doc[page_num]
+        page_text = page.get_text()
+        st.info(f"페이지 {page_num+1} 텍스트 미리보기:\n\n{page_text[:400]}")
+        try:
+            items = extract_questions_with_gpt(page_text)
+            if isinstance(items, list):
                 all_items.extend(items)
+        except Exception as e:
+            st.error(f"페이지 {page_num+1} 파싱 실패: {e}")
+            continue
 
-            if not all_items:
-                st.error("❌ 문제를 추출하지 못했습니다.")
-                return
-
-            # 3) 벡터스토어에 저장
-            save_path = save_exam_questions(category_name, all_items)
-            st.success(f"✅ {len(all_items)}문제 저장 완료: {save_path}")
-
-# ————————————
-# 2) 저장된 문제 불러와서 시험 응시 UI
-# ————————————
+    out_path = os.path.join(json_dir, f"{filename}.json")
+    with open(out_path, "w", encoding="utf-8") as fp:
+        json.dump(all_items, fp, ensure_ascii=False, indent=2)
+    return out_path
 
 def render(category_name: str):
-    st.header(f"🖋️ {category_name} 기출문제 응시")
+    st.header("📄 기출문제 모의 연습 (CBT)")
 
-    # ingestion UI
-    ingest_exam_pdf(category_name)
-    st.markdown("---")
-
-    # DB에서 불러오기
-    questions = load_exam_questions(category_name)
-    if not questions:
-        st.info("❗ 아직 저장된 기출문제가 없습니다. PDF를 업로드 후 저장하세요.")
+    pdfs = list_uploaded_pdfs(category_name)
+    if not pdfs:
+        st.info("❗ 먼저 PDF를 업로드하세요.")
         return
 
-    # 시험 시작 버튼
-    if "exam_started" not in st.session_state:
-        if st.button("▶️ 시험 시작"):
-            st.session_state.exam_started = True
-            st.session_state.current = 0
-            st.session_state.user_answers = {}
-        else:
-            return
+    sel_pdf = st.selectbox("▶️ PDF 선택", pdfs, key="exam_pdf_sel")
+    if st.button("파싱하여 시험 문제 저장"):
+        with st.spinner("⏳ GPT-4o로 문제 추출 중..."):
+            try:
+                saved = parse_pdf_and_save(category_name, sel_pdf)
+                st.success(f"✅ JSON 저장: `{saved}`")
+            except Exception as e:
+                st.error(f"파싱 오류: {e}")
+        st.rerun()
 
-    # 시험 진행
-    total = len(questions)
-    idx = st.session_state.current
-    q = questions[idx]
+    st.markdown("---")
 
-    st.markdown(f"**문제 {idx+1}/{total} (페이지 {q.get('page','-')})**")
-    st.write(q["question"])
-    choice = st.radio(
-        "보기 선택",
-        q["choices"],
-        key=f"exam_choice_{idx}"
-    )
-    st.session_state.user_answers[idx] = q["choices"].index(choice) + 1
+    jsons = list_saved_jsons(category_name)
+    if not jsons:
+        st.info("❗ 파싱된 JSON이 없습니다.")
+        return
 
-    col1, col2 = st.columns(2)
-    with col1:
-        if idx > 0:
-            if st.button("◀️ 이전 문제"):
-                st.session_state.current -= 1
-    with col2:
-        if idx < total - 1:
-            if st.button("다음 문제 ▶️"):
-                st.session_state.current += 1
-        else:
-            if st.button("✅ 시험 제출"):
-                st.session_state.completed = True
+    sel_json = st.selectbox("💾 저장된 문제 파일", jsons, key="exam_json_sel")
+    json_path = os.path.join(EXAM_DB_DIR, category_name, f"{sel_json}.json")
+    with open(json_path, "r", encoding="utf-8") as fp:
+        questions = json.load(fp)
 
-    # 채점 & 해설
-    if st.session_state.get("completed", False):
-        score = sum(
-            1 for i, q in enumerate(questions)
-            if st.session_state.user_answers.get(i) == q["answer"]
+    if "answers" not in st.session_state:
+        st.session_state.answers = {}
+
+    with st.form("exam_form"):
+        for i, qi in enumerate(questions):
+            st.markdown(f"**Q{i+1}. {qi['question']}**")
+            c = st.radio(
+                label="",
+                options=qi["choices"],
+                key=f"exam_choice_{i}",
+                label_visibility="collapsed"
+            )
+            st.session_state.answers[i] = qi["choices"].index(c) + 1
+        submitted = st.form_submit_button("제출")
+
+    if submitted:
+        correct = sum(
+            1 for i, qi in enumerate(questions)
+            if st.session_state.answers.get(i) == qi["answer"]
         )
-        pct = int(score / total * 100)
-        st.success(f"🎉 점수: {score}/{total} ({pct}점)")
-        with st.expander("🔍 해설 보기"):
-            for i, q in enumerate(questions):
-                st.markdown(f"**Q{i+1}. {q['question']}**")
-                st.markdown(f"- 정답: {q['choices'][q['answer']-1]}")
-                st.markdown(f"- 해설: {q['explanation']}")
-        # 초기화
-        if st.button("🔄 다시 보기"):
-            for k in ["exam_started","user_answers","current","completed"]:
-                st.session_state.pop(k, None)
-            st.experimental_rerun()
+        total = len(questions)
+        pct = int(correct/total*100) if total else 0
+        st.success(f"총 {total}문제 중 {correct}문제 정답 (점수: {pct}점)")
+
+        if correct < total:
+            with st.expander("❌ 오답 해설"):
+                for i, qi in enumerate(questions):
+                    if st.session_state.answers.get(i) != qi["answer"]:
+                        st.markdown(f"- **Q{i+1}. {qi['question']}**")
+                        st.markdown(f"  - 정답: {qi['choices'][qi['answer']-1]}")
+                        st.markdown(f"  - 해설: {qi['explanation']}")
+
+        if st.button("🔄 다시 풀기"):
+            del st.session_state.answers
+            st.rerun()

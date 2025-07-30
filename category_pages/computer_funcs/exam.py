@@ -32,10 +32,12 @@ def list_saved_jsons(category: str):
 
 def extract_questions_with_gpt(text):
     prompt = (
-        "아래는 자격증 객관식 시험 문제 텍스트입니다.\n"
-        "문제, 보기를 감지해서 아래 형식의 JSON 배열로 반환하세요. 반드시 문제, choices(4지선다), answer(정답 번호 1~4), explanation(해설 또는 '없음') 필드를 포함.\n"
-        "설명, 안내, 코드블록 없이 아래 예시와 똑같은 JSON만 반환하세요.\n"
-        "예시: [{\"question\": \"질문\", \"choices\": [\"보1\",\"보2\",\"보3\",\"보4\"], \"answer\": 2, \"explanation\": \"해설\"}]"
+        "아래 텍스트는 자격증 객관식 시험 문제지입니다.\n"
+        "문항 번호(Q1, Q2, ...)로 시작하는 부분만 문제로 인식해서 추출하세요.\n"
+        "정답, 해설, 정답표, 해설집, 해설 모음, 보충 설명 등은 문제로 인식하지 말고 무시하세요.\n"
+        "각 문제는 question, choices(4지선다), answer(정답 번호 1~4), explanation(해설 또는 '없음') 필드를 갖는 JSON 배열로만 반환하세요.\n"
+        "설명, 안내, 코드블록 없이 예시와 완전히 동일한 JSON 배열만 출력하세요.\n"
+        "예시: [{\"question\": \"질문\", \"choices\": [\"보기1\", \"보기2\", \"보기3\", \"보기4\"], \"answer\": 2, \"explanation\": \"해설\"}]"
     )
     completion = openai.chat.completions.create(
         model="gpt-4o",

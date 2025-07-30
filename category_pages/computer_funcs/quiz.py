@@ -1,5 +1,3 @@
-# category_pages/computer_funcs/quiz.py
-
 import streamlit as st
 from langchain_openai import ChatOpenAI
 from vectorstore_utils import load_chroma_vectorstore
@@ -15,7 +13,7 @@ def build_context_from_docs(docs, max_length=8000):
 
 def generate_quiz(llm, context, topic):
     prompt = f"""
-너는 컴퓨터활용능력 자격시험의 객관식 문제 출제자야.
+너는 자격시험 객관식 문제 출제자야.
 '{topic}'와 직접적으로 관련된 내용만 사용해 10문제 출제해줘.
 각 문제는 보기 4개, 정답 번호, 해설을 포함해야 해.
 형식:

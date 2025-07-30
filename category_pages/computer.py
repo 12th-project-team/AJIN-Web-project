@@ -2,7 +2,7 @@ import streamlit as st
 import os
 from pathlib import Path
 from langchain_community.document_loaders import PyPDFLoader
-from vectorstore_utils import save_chroma_vectorstore, list_chroma_files, delete_chroma_vectorstore
+from vectorstore_utils import save_chroma_vectorstore, list_chroma_files
 from category_pages.computer_funcs.summary import render as render_summary
 from category_pages.computer_funcs.quiz import render as render_quiz
 from category_pages.computer_funcs.exam import render as render_exam
@@ -47,7 +47,6 @@ def render():
 
     st.markdown("---")
     st.subheader("📚 저장된 문서 목록")
-    # preview도 카테고리별 폴더에서 가져오도록
     subfolders = list_chroma_files(CATEGORY_NAME)
     if subfolders:
         for folder in subfolders:

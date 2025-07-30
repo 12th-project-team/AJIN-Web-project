@@ -9,6 +9,7 @@ from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from vectorstore_utils import list_chroma_files, delete_chroma_vectorstore
 from category_pages import computer
+
 from category_pages.computer_funcs.summary import render as render_summary
 from category_pages.computer_funcs.quiz import render as render_quiz
 from category_pages.computer_funcs.exam import render as render_exam
@@ -44,9 +45,6 @@ if "slug_map" not in st.session_state:
     st.session_state.slug_map = {}
 
 def generate_slug(category_name: str) -> str:
-    """
-    OpenAI로부터 영숫자 슬러그를 받아옵니다.
-    """
     system = (
         "You are a slug generator.  "
         "Given a Korean category name, respond with exactly one "
@@ -70,9 +68,6 @@ def generate_slug(category_name: str) -> str:
     return slug
 
 def get_slug(category_name: str) -> str:
-    """
-    캐시에 슬러그가 있으면 사용, 없으면 생성 후 캐싱
-    """
     if category_name in st.session_state.slug_map:
         return st.session_state.slug_map[category_name]
     slug = generate_slug(category_name)
@@ -100,33 +95,60 @@ def create_new_category_with_funcs(category_name: str):
     if not os.path.exists(dst_funcs):
         shutil.copytree(src, dst_funcs)
 
-    # 페이지 모듈 생성
+    # 페이지 모듈 생성 (==컴퓨터 카테고리 구조 동일하게)
     if not os.path.exists(dst_page):
         with open(dst_page, "w", encoding="utf-8") as f:
             f.write(f'''\
 import streamlit as st
-from category_pages import {slug}_funcs as funcs
+import os
+from pathlib import Path
+from vectorstore_utils import save_chroma_vectorstore, list_chroma_files
+from category_pages.{slug}_funcs.summary import render as render_summary
+from category_pages.{slug}_funcs.quiz import render as render_quiz
+from category_pages.{slug}_funcs.exam import render as render_exam
+from category_pages.{slug}_funcs.chatbot import render as render_chatbot
+from category_pages.{slug}_funcs.preview import render as preview
+
+CATEGORY_NAME = "{category_name}"
+UPLOAD_DIR = "uploaded_pdfs"
 
 def render():
-    st.header("📘 {category_name}")
+    st.header(f"📁 {{CATEGORY_NAME}}")
 
-    # 업로드 탭
-    funcs.upload("{category_name}")
+    # 📤 PDF 업로드 (카테고리별 폴더에 저장)
+    uploaded_file = st.file_uploader(
+        "📤 PDF 업로드", type=["pdf"], key="upload_{{CATEGORY_NAME}}"
+    )
+    if uploaded_file:
+        os.makedirs(os.path.join(UPLOAD_DIR, CATEGORY_NAME), exist_ok=True)
+        filename = Path(uploaded_file.name).stem
+        pdf_path = os.path.join(UPLOAD_DIR, CATEGORY_NAME, f"{{filename}}.pdf")
+        with open(pdf_path, "wb") as f2:
+            f2.write(uploaded_file.getbuffer())
+        st.success(f"✅ 저장 완료: '{{pdf_path}}'")
+
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📌 요점정리", "✅ 퀴즈", "📄 기출문제", "🤖 챗봇"
+    ])
+    with tab1:
+        render_summary(CATEGORY_NAME)
+    with tab2:
+        render_quiz(CATEGORY_NAME)
+    with tab3:
+        render_exam(CATEGORY_NAME)
+    with tab4:
+        render_chatbot(CATEGORY_NAME)
+
     st.markdown("---")
-
-    # 미리보기 탭
-    funcs.preview("{category_name}")
-    st.markdown("---")
-
-    # AI 탭
-    tab1, tab2, tab3, tab4 = st.tabs(["요약","기출문제","퀴즈","챗봇"])
-    with tab1: funcs.summary("{category_name}")
-    with tab2: funcs.exam("{category_name}")
-    with tab3: funcs.quiz("{category_name}")
-    with tab4: funcs.chatbot("{category_name}")
+    st.subheader("📚 저장된 문서 목록")
+    subfolders = list_chroma_files(CATEGORY_NAME)
+    if subfolders:
+        for folder in subfolders:
+            preview(f"{{CATEGORY_NAME}}/{{folder}}")
+    else:
+        st.info("❗ 저장된 문서가 없습니다.")
 ''')
 
-    # vectordb에도 등록
     vectordb.add_texts(texts=[category_name], ids=[category_name])
     vectordb.persist()
 
@@ -145,29 +167,18 @@ def load_dynamic_category(category_name: str):
 # 6) 카테고리 삭제
 def delete_category(category_name: str):
     slug = st.session_state.slug_map.get(category_name) or get_slug(category_name)
-
     # 페이지 모듈 & funcs 폴더 삭제
     for path in [f"category_pages/{slug}.py", f"category_pages/{slug}_funcs"]:
         if os.path.exists(path):
             shutil.rmtree(path) if os.path.isdir(path) else os.remove(path)
-
-    # __pycache__ 제거
     delete_pycache("category_pages")
-
-    # 문서 임베딩 삭제
     cat_dir = os.path.join(PERSIST_DIR, category_name)
     if os.path.exists(cat_dir):
         shutil.rmtree(cat_dir)
-
-    # 문서별 vectorestore/PDF 삭제
     for fn in list_chroma_files(category_name):
         delete_chroma_vectorstore(category_name, fn)
-
-    # vectordb 메타에서 제거
     vectordb.delete(ids=[category_name])
     vectordb.persist()
-
-    # 세션/UI 정리
     st.session_state.all_categories.pop(category_name, None)
     st.session_state.slug_map.pop(category_name, None)
     if st.session_state.selected_category == category_name:
@@ -196,24 +207,20 @@ st.markdown("### 📂 카테고리를 선택하거나 새로 추가하세요")
 cols = st.columns(len(st.session_state.all_categories) + 2, gap="small")
 keys = list(st.session_state.all_categories.keys())
 
-# 기존 카테고리 버튼
 for i, cat in enumerate(keys):
     with cols[i]:
         color = "red" if st.session_state.selected_category == cat else "gray"
         if st.button(f"**:{color}[{cat}]**", key=f"btn_{cat}"):
             st.session_state.selected_category = cat
 
-# ➕ 추가 버튼
 with cols[-2]:
     if st.button("➕"):
         st.session_state.show_add = True
 
-# 🗑️ 삭제 버튼
 with cols[-1]:
     if st.button("🗑️"):
         st.session_state.show_delete_confirm = True
 
-# ➕ 새 카테고리 추가 UI
 if st.session_state.get("show_add", False):
     with st.expander("➕ 새 카테고리 추가", expanded=True):
         new_name = st.text_input("카테고리 이름 입력", placeholder="예: 전자상거래")
@@ -229,7 +236,6 @@ if st.session_state.get("show_add", False):
                 st.session_state.show_add = False
                 st.rerun()
 
-# 🗑️ 삭제 확인 UI
 if st.session_state.get("show_delete_confirm", False):
     with st.expander(f"❗ '{st.session_state.selected_category}' 삭제하시겠습니까?", expanded=True):
         if st.button("삭제"):
@@ -239,5 +245,4 @@ if st.session_state.get("show_delete_confirm", False):
             st.rerun()
 
 st.markdown("---")
-# 선택된 카테고리 렌더링
 st.session_state.all_categories[st.session_state.selected_category]()
